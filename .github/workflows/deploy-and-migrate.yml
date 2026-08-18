@@ -1,0 +1,53 @@
+name: Deploy to Vercel and run migrations
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  migrate-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install root deps
+        working-directory: ./world-trading-game-tnt
+        run: npm ci
+
+      - name: Run DB migrations
+        working-directory: ./world-trading-game-tnt
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          node scripts/run_migrations.js
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }} # Required
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }} # Required
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }} # Required
+          working-directory: ./world-trading-game-tnt
+          prod: true
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+# Secrets required (set in GitHub repo Settings > Secrets):
+# - DATABASE_URL: postgres connection string for your Supabase DB (used by migrations)
+# - NEXT_PUBLIC_SUPABASE_URL: Supabase project URL
+# - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: Supabase anon/public key
+# - SUPABASE_SERVICE_ROLE: Supabase service role key (server-only)
+# - VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID: credentials for Vercel deployment
+
+# Important security note:
+# - SUPABASE_SERVICE_ROLE and DATABASE_URL are sensitive and must be set as GitHub secrets. They must never be exposed to client-side code.
+# - This workflow runs migrations before deployment. If you prefer manual control, remove the migration step and run migrations separately.
