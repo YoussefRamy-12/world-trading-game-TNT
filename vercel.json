@@ -1,9 +1,0 @@
-{
-  "builds": [
-    { "src": "world-trading-game-tnt/package.json", "use": "@vercel/next" }
-  ],
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/world-trading-game-tnt/$1" }
-  ]
-}
