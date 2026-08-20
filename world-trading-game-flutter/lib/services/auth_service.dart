@@ -12,8 +12,14 @@ class AuthService {
     await client.auth.signInWithPassword(email: email.trim(), password: password);
   }
 
-  Future<void> signUp({required String email, required String password}) async {
-    await client.auth.signUp(email: email.trim(), password: password);
+  Future<void> signUp({required String email, required String password, String? displayName}) async {
+    await client.auth.signUp(
+      email: email.trim(),
+      password: password,
+      data: {
+        if (displayName != null && displayName.trim().isNotEmpty) 'display_name': displayName.trim(),
+      },
+    );
   }
 
   Future<void> signOut() => client.auth.signOut();
