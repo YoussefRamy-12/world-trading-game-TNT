@@ -231,8 +231,8 @@ class _CountryMarker extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? accent.withOpacity(.22) : const Color(0xDD071827),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: selected ? accent : accent.withOpacity(.55), width: selected ? 2 : 1),
-            boxShadow: [BoxShadow(color: accent.withOpacity(.18), blurRadius: selected ? 18 : 8)],
+            border: Border.all(color: selected ? accent : accent.withValues(alpha: .55), width: selected ? 2 : 1),
+            boxShadow: [BoxShadow(color: accent.withValues(alpha: .18), blurRadius: selected ? 18 : 8)],
           ),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.location_on, size: selected ? 20 : 17, color: accent),
@@ -248,7 +248,7 @@ class _CountryMarker extends StatelessWidget {
 class _WorldPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final grid = Paint()..color = Colors.white.withOpacity(.035)..strokeWidth = 1;
+    final grid = Paint()..color = Colors.white.withValues(alpha: .035)..strokeWidth = 1;
     for (var x = 0.0; x < size.width; x += 45) canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
     for (var y = 0.0; y < size.height; y += 45) canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
 
@@ -390,7 +390,7 @@ class _OwnershipBanner extends StatelessWidget {
   final String owner;
   const _OwnershipBanner({required this.mine, required this.owner});
   @override
-  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(13), decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), color: mine ? Colors.cyan.withOpacity(.10) : Colors.white.withOpacity(.04)), child: Row(children: [Icon(mine ? Icons.verified : Icons.flag, color: mine ? Colors.cyanAccent : Colors.white70), const SizedBox(width: 10), Text(owner)]));
+  Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(13), decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), color: mine ? Colors.cyan.withValues(alpha:.10) : Colors.white.withValues(alpha: .04)), child: Row(children: [Icon(mine ? Icons.verified : Icons.flag, color: mine ? Colors.cyanAccent : Colors.white70), const SizedBox(width: 10), Text(owner)]));
 }
 
 class _BuildingRow extends StatelessWidget {
