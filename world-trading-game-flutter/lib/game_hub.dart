@@ -8,11 +8,11 @@ import 'services/action_guard.dart';
 import 'services/game_repository.dart';
 import 'services/realtime_service.dart';
 import 'real_world_map.dart';
+import 'admin_console.dart';
 
 class GameHubPage extends StatefulWidget {
   final Game game;
   const GameHubPage({super.key, required this.game});
-
   @override
   State<GameHubPage> createState() => _GameHubPageState();
 }
@@ -87,7 +87,7 @@ class _GameHubPageState extends State<GameHubPage> {
       _PortfolioPage(player: player, countries: countries, netWorths: netWorths, walletBalance: walletBalance, repository: repo, guard: guard, onChanged: load),
       _MarketplacePage(player: player, countries: countries, listings: listings, repository: repo, guard: guard, onChanged: load),
       _LeaderboardPage(player: player, netWorths: netWorths),
-      if (player?.isAdmin == true) _AdminPage(game: game, repository: repo, guard: guard, onChanged: load),
+      if (player?.isAdmin == true) AdminConsolePage(gameId: game.id, repository: repo, guard: guard, onChanged: load),
     ];
 
     final destinations = <NavigationDestination>[
@@ -114,7 +114,6 @@ class _GameStatusBar extends StatelessWidget {
   final int? balance;
   final VoidCallback onRefresh;
   const _GameStatusBar({required this.game, required this.balance, required this.onRefresh});
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -140,9 +139,7 @@ class _PortfolioPage extends StatelessWidget {
   final GameRepository repository;
   final ActionGuard guard;
   final Future<void> Function() onChanged;
-
   const _PortfolioPage({required this.player, required this.countries, required this.netWorths, required this.walletBalance, required this.repository, required this.guard, required this.onChanged});
-
   @override
   Widget build(BuildContext context) {
     final owned = countries.where((c) => c.ownerPlayerId == player?.id).toList();
@@ -151,51 +148,38 @@ class _PortfolioPage extends StatelessWidget {
     final countryValue = owned.fold<int>(0, (sum, c) => sum + (c.value ?? 0));
     return Scaffold(
       appBar: AppBar(title: const Text('My Portfolio')),
-      body: RefreshIndicator(
-        onRefresh: onChanged,
-        child: ListView(padding: const EdgeInsets.all(20), children: [
-          Text(player?.displayName.isNotEmpty == true ? player!.displayName : 'Player', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 16),
-          LayoutBuilder(builder: (context, c) {
-            final columns = c.maxWidth >= 850 ? 4 : c.maxWidth >= 520 ? 2 : 1;
-            return GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: columns, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 2.3, children: [
-              _Stat(title: 'Cash', value: walletBalance == null ? '—' : '\$$walletBalance', icon: Icons.account_balance_wallet),
-              _Stat(title: 'Countries', value: '${owned.length}', icon: Icons.public),
-              _Stat(title: 'Country value', value: '\$$countryValue', icon: Icons.trending_up),
-              _Stat(title: 'Net worth', value: '\$$netWorth', icon: Icons.auto_graph),
-            ]);
-          }),
-          const SizedBox(height: 24),
-          Text('My Countries', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          if (owned.isEmpty) const Card(child: ListTile(title: Text('No countries owned yet.'))),
-          for (final country in owned) Card(child: ListTile(
-            leading: const Icon(Icons.flag),
-            title: Text(country.name),
-            subtitle: Text('Value: ${country.value == null ? '—' : '\$${country.value}'}'),
-            trailing: FilledButton.tonal(onPressed: () => _showSellDialog(context, country), child: const Text('Sell')),
-          )),
-        ]),
-      ),
+      body: RefreshIndicator(onRefresh: onChanged, child: ListView(padding: const EdgeInsets.all(20), children: [
+        Text(player?.displayName.isNotEmpty == true ? player!.displayName : 'Player', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 16),
+        LayoutBuilder(builder: (context, c) {
+          final columns = c.maxWidth >= 850 ? 4 : c.maxWidth >= 520 ? 2 : 1;
+          return GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: columns, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 2.3, children: [
+            _Stat(title: 'Cash', value: walletBalance == null ? '—' : '\$$walletBalance', icon: Icons.account_balance_wallet),
+            _Stat(title: 'Countries', value: '${owned.length}', icon: Icons.public),
+            _Stat(title: 'Country value', value: '\$$countryValue', icon: Icons.trending_up),
+            _Stat(title: 'Net worth', value: '\$$netWorth', icon: Icons.auto_graph),
+          ]);
+        }),
+        const SizedBox(height: 24),
+        Text('My Countries', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 8),
+        if (owned.isEmpty) const Card(child: ListTile(title: Text('No countries owned yet.'))),
+        for (final country in owned) Card(child: ListTile(
+          leading: const Icon(Icons.flag),
+          title: Text(country.name),
+          subtitle: Text('Value: ${country.value == null ? '—' : '\$${country.value}'}'),
+          trailing: FilledButton.tonal(onPressed: () => _showSellDialog(context, country), child: const Text('Sell')),
+        )),
+      ])),
     );
   }
-
   Future<void> _showSellDialog(BuildContext context, Country country) async {
     final controller = TextEditingController(text: '${country.value ?? 0}');
-    final price = await showDialog<int>(context: context, builder: (dialogContext) => AlertDialog(
-      title: Text('List ${country.name} for sale'),
-      content: TextField(controller: controller, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price', prefixText: '\$')),
-      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialogContext, int.tryParse(controller.text.trim())), child: const Text('List'))],
-    ));
+    final price = await showDialog<int>(context: context, builder: (dialogContext) => AlertDialog(title: Text('List ${country.name} for sale'), content: TextField(controller: controller, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Price', prefixText: '\$')), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialogContext, int.tryParse(controller.text.trim())), child: const Text('List'))]));
     controller.dispose();
     if (price == null || price <= 0) return;
-    try {
-      await guard.run('sell:${country.id}', () => repository.sellCountry(countryId: country.id, price: price));
-      await onChanged();
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Country listed for sale.')));
-    } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
+    try { await guard.run('sell:${country.id}', () => repository.sellCountry(countryId: country.id, price: price)); await onChanged(); if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Country listed for sale.'))); }
+    catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
   }
 }
 
@@ -207,7 +191,6 @@ class _MarketplacePage extends StatelessWidget {
   final ActionGuard guard;
   final Future<void> Function() onChanged;
   const _MarketplacePage({required this.player, required this.countries, required this.listings, required this.repository, required this.guard, required this.onChanged});
-
   @override
   Widget build(BuildContext context) {
     final open = listings.where((l) => l.status == 'open').toList();
@@ -218,24 +201,10 @@ class _MarketplacePage extends StatelessWidget {
       for (final listing in open) _listingCard(context, listing),
     ]));
   }
-
   Widget _listingCard(BuildContext context, CountryListing listing) {
     final country = countries.where((c) => c.id == listing.countryId).firstOrNull;
     final mine = listing.sellerPlayerId == player?.id;
-    return Card(child: ListTile(
-      leading: const Icon(Icons.public),
-      title: Text(country?.name ?? 'Country'),
-      subtitle: Text('${listing.currency} ${listing.price} • ${mine ? 'Your listing' : 'Listed by another player'}'),
-      trailing: mine ? const Chip(label: Text('Yours')) : FilledButton(onPressed: () async {
-        try {
-          await guard.run('buy:${listing.id}', () => repository.buyCountry(listing.id));
-          await onChanged();
-          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Country purchased.')));
-        } catch (e) {
-          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        }
-      }, child: const Text('Buy')),
-    ));
+    return Card(child: ListTile(leading: const Icon(Icons.public), title: Text(country?.name ?? 'Country'), subtitle: Text('${listing.currency} ${listing.price} • ${mine ? 'Your listing' : 'Listed by another player'}'), trailing: mine ? const Chip(label: Text('Yours')) : FilledButton(onPressed: () async { try { await guard.run('buy:${listing.id}', () => repository.buyCountry(listing.id)); await onChanged(); if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Country purchased.'))); } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); } }, child: const Text('Buy'))));
   }
 }
 
@@ -243,7 +212,6 @@ class _LeaderboardPage extends StatelessWidget {
   final Player? player;
   final List<Map<String, dynamic>> netWorths;
   const _LeaderboardPage({required this.player, required this.netWorths});
-
   @override
   Widget build(BuildContext context) {
     final rows = [...netWorths]..sort((a, b) => _number(b['net_worth']).compareTo(_number(a['net_worth'])));
@@ -253,48 +221,11 @@ class _LeaderboardPage extends StatelessWidget {
       if (rows.isEmpty) const Card(child: ListTile(title: Text('Leaderboard is not available yet.'))),
     ]));
   }
-
   Widget _rankTile(int rank, Map<String, dynamic> row) {
     final mine = row['player_id']?.toString() == player?.id;
     final name = (row['display_name'] ?? row['player_name'] ?? 'Player $rank').toString();
     return Card(child: ListTile(leading: CircleAvatar(child: Text('$rank')), title: Text(name, style: TextStyle(fontWeight: mine ? FontWeight.bold : FontWeight.normal)), subtitle: mine ? const Text('You') : null, trailing: Text('\$${_number(row['net_worth'])}')));
   }
-}
-
-class _AdminPage extends StatelessWidget {
-  final Game game;
-  final GameRepository repository;
-  final ActionGuard guard;
-  final Future<void> Function() onChanged;
-  const _AdminPage({required this.game, required this.repository, required this.guard, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(appBar: AppBar(title: const Text('Admin Controls')), body: ListView(padding: const EdgeInsets.all(20), children: [
-      Card(child: ListTile(leading: const Icon(Icons.admin_panel_settings), title: const Text('Game administration'), subtitle: Text('State: ${game.state.toUpperCase()} • Tick ${game.currentTick}'))),
-      const SizedBox(height: 12),
-      _adminAction(context, 'Prepare game', Icons.check_circle_outline, () => repository.setGameReady(game.id)),
-      _adminAction(context, 'Start game', Icons.play_arrow, () => repository.startGame(game.id)),
-      _adminAction(context, 'Pause game', Icons.pause, () => repository.pauseGame(game.id)),
-      _adminAction(context, 'Resume game', Icons.play_circle, () => repository.resumeGame(game.id)),
-      _adminAction(context, 'Advance one tick', Icons.timelapse, () => repository.advanceTick(game.id)),
-      _adminAction(context, 'Finish game', Icons.flag, () => repository.finishGame(game.id)),
-      const SizedBox(height: 12),
-      const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Tick execution stays server-side. Flutter only requests a tick through the existing RPC, preventing clients from inventing or duplicating economy calculations.'))),
-    ]));
-  }
-
-  Widget _adminAction(BuildContext context, String label, IconData icon, Future<dynamic> Function() action) => Card(child: ListTile(
-    leading: Icon(icon), title: Text(label), trailing: FilledButton(onPressed: () async {
-      try {
-        await guard.run('admin:${game.id}:$label', action);
-        await onChanged();
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label completed.')));
-      } catch (e) {
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
-    }, child: const Text('Run')),
-  ));
 }
 
 class _Stat extends StatelessWidget {
@@ -303,7 +234,7 @@ class _Stat extends StatelessWidget {
   final IconData icon;
   const _Stat({required this.title, required this.value, required this.icon});
   @override
-  Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(14), child: Row(children: [Icon(icon), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title), Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))]))]));
+  Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(14), child: Row(children: [Icon(icon), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title), Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))]))])));
 }
 
 class _ErrorState extends StatelessWidget {
