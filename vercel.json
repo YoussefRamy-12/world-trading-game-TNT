@@ -1,0 +1,3 @@
+{
+  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"flutter\" ]; then echo 'Flutter branch is built by GitHub Actions; skipping Vercel deployment.'; exit 0; else exit 1; fi"
+}
