@@ -2,10 +2,8 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Keeps the Flutter client synchronized with changes made by other players.
-///
-/// This is intentionally client-only: it does not alter the existing Supabase
-/// schema, RPCs, migrations, or database configuration.
+/// Keeps the Flutter client synchronized with changes made by other players
+/// and with server-side economy ticks.
 class GameRealtimeService {
   final SupabaseClient _client;
   RealtimeChannel? _channel;
@@ -50,6 +48,24 @@ class GameRealtimeService {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'games',
+          callback: (_) => _notify(onChanged, onError),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'wallets',
+          callback: (_) => _notify(onChanged, onError),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'income_records',
+          callback: (_) => _notify(onChanged, onError),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'leaderboard_snapshots',
           callback: (_) => _notify(onChanged, onError),
         )
       ..subscribe((status, error) {
