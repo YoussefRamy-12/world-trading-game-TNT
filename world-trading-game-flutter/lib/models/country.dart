@@ -1,5 +1,6 @@
 class Country {
   final String id;
+  final String? gameId;
   final String name;
   final String? code;
   final int population;
@@ -9,6 +10,7 @@ class Country {
 
   const Country({
     required this.id,
+    this.gameId,
     required this.name,
     this.code,
     this.population = 0,
@@ -20,6 +22,7 @@ class Country {
   factory Country.fromMap(Map<String, dynamic> map) {
     return Country(
       id: map['id'].toString(),
+      gameId: map['game_id']?.toString(),
       name: (map['name'] ?? 'Unknown').toString(),
       code: map['code']?.toString(),
       population: _toInt(map['population']),
