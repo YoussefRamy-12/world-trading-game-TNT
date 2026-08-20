@@ -27,6 +27,13 @@ class GameRepository {
     return row == null ? null : Player.fromMap(Map<String, dynamic>.from(row));
   }
 
+  Future<int?> fetchWalletBalance(String playerId, {String currency = 'USD'}) async {
+    final row = await client.from('wallets').select('balance').eq('player_id', playerId).eq('currency', currency).maybeSingle();
+    if (row == null) return null;
+    final value = row['balance'];
+    return value is num ? value.toInt() : int.tryParse('$value');
+  }
+
   Future<String> registerPlayer({String? displayName, String? avatarUrl}) async {
     _requireAuth();
     final result = await client.rpc('register_player', params: {
@@ -55,14 +62,16 @@ class GameRepository {
     final result = <Country>[];
     for (final country in countries) {
       final value = await client.rpc('country_value', params: {'p_country': country.id});
-      result.add(Country.fromMap({...{
+      result.add(Country.fromMap({
         'id': country.id,
+        'game_id': country.gameId,
         'name': country.name,
         'code': country.code,
         'population': country.population,
         'resources': country.resources,
         'owner_player_id': country.ownerPlayerId,
-      }, 'value': value}));
+        'value': value,
+      }));
     }
     return result;
   }
@@ -79,9 +88,7 @@ class GameRepository {
 
   Future<String> purchaseBuildings({required String countryId, required int buildingTypeId, int quantity = 1}) async {
     _requireAuth();
-    if (quantity != 1) {
-      throw ArgumentError('A country can receive only one building per build action.');
-    }
+    if (quantity != 1) throw ArgumentError('A country can receive only one building per build action.');
     final result = await client.rpc('purchase_buildings', params: {
       'p_country': countryId,
       'p_building_type': buildingTypeId,
