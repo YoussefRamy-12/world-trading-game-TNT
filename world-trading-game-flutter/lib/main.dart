@@ -102,39 +102,220 @@ class GamePage extends StatefulWidget {
   @override State<GamePage> createState() => _GamePageState();
 }
 class _GamePageState extends State<GamePage> {
+  static const int maxCountryLevel = 5;
+
   final repo = GameRepository(), guard = ActionGuard();
-  late Game game; Player? player; List<Country> countries = []; List<BuildingType> buildingTypes = []; Map<String, List<CountryBuilding>> buildings = {}; bool loading = true;
+  late Game game;
+  Player? player;
+  List<Country> countries = [];
+  List<BuildingType> buildingTypes = [];
+  Map<String, List<CountryBuilding>> buildings = {};
+  bool loading = true;
+
   @override void initState() { super.initState(); game = widget.game; load(); }
+
   Future<void> load() async {
     setState(() => loading = true);
     try {
-      final data = await Future.wait([repo.fetchGame(game.id), repo.fetchCurrentPlayer(), repo.fetchCountries(gameId: game.id), repo.fetchBuildingTypes()]);
-      game = data[0] as Game? ?? game; player = data[1] as Player?; countries = data[2] as List<Country>; buildingTypes = data[3] as List<BuildingType>;
+      final data = await Future.wait([
+        repo.fetchGame(game.id),
+        repo.fetchCurrentPlayer(),
+        repo.fetchCountries(gameId: game.id),
+        repo.fetchBuildingTypes(),
+      ]);
+      game = data[0] as Game? ?? game;
+      player = data[1] as Player?;
+      countries = data[2] as List<Country>;
+      buildingTypes = data[3] as List<BuildingType>;
       buildings = {};
-      for (final c in countries) buildings[c.id] = await repo.fetchCountryBuildings(c.id);
-    } catch (e) { if (mounted) _snack(context, e); }
+      for (final c in countries) {
+        buildings[c.id] = await repo.fetchCountryBuildings(c.id);
+      }
+    } catch (e) {
+      if (mounted) _snack(context, e);
+    }
     if (mounted) setState(() => loading = false);
   }
-  Future<void> buy(Country c, BuildingType type) async {
-    if (buildings[c.id]!.any((b) => b.buildingTypeId == type.id)) { _snack(context, 'Only one ${type.name} can exist on the same country.'); return; }
-    try { await guard.run('buy-building:${c.id}:${type.id}', () => repo.purchaseBuildings(countryId: c.id, buildingTypeId: type.id, quantity: 1)); await load(); if (mounted) _snack(context, '${type.name} built on ${c.name}.'); }
-    catch (e) { if (mounted) _snack(context, e); }
+
+  int countryLevel(Country country) {
+    // Level 1 is the country's raw/essential state. Every additional
+    // building installed by the player advances the country by one level.
+    final count = buildings[country.id]?.length ?? 0;
+    return count.clamp(1, maxCountryLevel);
   }
-  Future<void> upgrade(Country c, CountryBuilding b) async {
-    if (buildings[c.id]!.any((x) => x.level > 1)) { _snack(context, 'Only one upgrade is allowed on the same country.'); return; }
-    final type = buildingTypes.where((x) => x.id == b.buildingTypeId).firstOrNull;
-    if (type == null || type.maxLevel <= b.level) { _snack(context, 'This building cannot be upgraded further.'); return; }
-    try { await guard.run('upgrade:${b.id}', () => repo.upgradeBuilding(countryBuildingId: b.id, newLevel: b.level + 1)); await load(); if (mounted) _snack(context, '${type.name} upgraded on ${c.name}.'); }
-    catch (e) { if (mounted) _snack(context, e); }
+
+  int? get essentialBuildingTypeId {
+    if (buildingTypes.isEmpty) return null;
+    // The first building type is the mandatory Level 1 building in the
+    // existing game data. It is shown as automatic and is never purchased.
+    return buildingTypes.map((type) => type.id).reduce((a, b) => a < b ? a : b);
   }
-  @override Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(game.name), actions: [Chip(label: Text('Tick ${game.currentTick}')), IconButton(onPressed: load, icon: const Icon(Icons.refresh))]), body: loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(20), children: [
-    Card(child: Padding(padding: const EdgeInsets.all(16), child: Row(children: [const Icon(Icons.public, size: 36), const SizedBox(width: 12), Expanded(child: Text('World board', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold))), Text('${countries.length} countries')]))), const SizedBox(height: 12),
-    for (final c in countries) Card(child: ExpansionTile(title: Text(c.name), subtitle: Text(c.ownerPlayerId == null ? 'Unowned' : c.ownerPlayerId == player?.id ? 'Your country' : 'Owned'), children: [
-      ListTile(title: const Text('Country value'), trailing: Text(c.value == null ? '—' : '\$${c.value}')),
-      for (final b in buildings[c.id]!) Builder(builder: (_) { final type = buildingTypes.where((x) => x.id == b.buildingTypeId).firstOrNull; final upgraded = b.level > 1; return ListTile(leading: const Icon(Icons.business), title: Text(type?.name ?? 'Building'), subtitle: Text('Level ${b.level}'), trailing: !upgraded && (type?.maxLevel ?? 1) > b.level ? OutlinedButton(onPressed: () => upgrade(c, b), child: const Text('Upgrade')) : const Text('Upgraded')); }),
-      if (c.ownerPlayerId == player?.id) Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [const Divider(), const Text('Build on this country', style: TextStyle(fontWeight: FontWeight.bold)), for (final type in buildingTypes) if (!buildings[c.id]!.any((b) => b.buildingTypeId == type.id)) ListTile(title: Text(type.name), subtitle: Text('Cost: ${type.baseCost}'), trailing: FilledButton(onPressed: () => buy(c, type), child: const Text('Build')))])),
-    ])),
-  ]));
+
+  Future<void> addBuilding(Country country, BuildingType type) async {
+    final currentBuildings = buildings[country.id] ?? const <CountryBuilding>[];
+    final level = countryLevel(country);
+
+    if (country.ownerPlayerId != player?.id) {
+      _snack(context, 'You can only build on countries you own.');
+      return;
+    }
+    if (type.id == essentialBuildingTypeId) {
+      _snack(context, '${type.name} is the automatic Level 1 building.');
+      return;
+    }
+    if (currentBuildings.any((b) => b.buildingTypeId == type.id)) {
+      _snack(context, 'Only one ${type.name} can exist on the same country.');
+      return;
+    }
+    if (level >= maxCountryLevel) {
+      _snack(context, 'This country is already Level $maxCountryLevel.');
+      return;
+    }
+
+    try {
+      await guard.run(
+        'add-building:${country.id}:${type.id}',
+        () => repo.purchaseBuildings(countryId: country.id, buildingTypeId: type.id, quantity: 1),
+      );
+      await load();
+      if (mounted) _snack(context, '${type.name} added to ${country.name}. Country is now Level ${countryLevel(country)}.');
+    } catch (e) {
+      if (mounted) _snack(context, e);
+    }
+  }
+
+  @override Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(game.name),
+      actions: [
+        Chip(label: Text('Tick ${game.currentTick}')),
+        IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
+      ],
+    ),
+    body: loading
+        ? const Center(child: CircularProgressIndicator())
+        : ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.public, size: 36),
+                      const SizedBox(width: 12),
+                      const Expanded(child: Text('World board', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold))),
+                      Text('${countries.length} countries'),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final country in countries) _countryCard(country),
+            ],
+          ),
+  );
+
+  Widget _countryCard(Country country) {
+    final countryBuildings = buildings[country.id] ?? const <CountryBuilding>[];
+    final level = countryLevel(country);
+    final ownedByMe = country.ownerPlayerId == player?.id;
+
+    return Card(
+      child: ExpansionTile(
+        title: Row(
+          children: [
+            Expanded(child: Text(country.name)),
+            _LevelBadge(level: level, maxLevel: maxCountryLevel),
+          ],
+        ),
+        subtitle: Text(country.ownerPlayerId == null ? 'Unowned' : ownedByMe ? 'Your country' : 'Owned'),
+        children: [
+          ListTile(
+            leading: const Icon(Icons.trending_up),
+            title: const Text('Country level'),
+            subtitle: Text(level == 1 ? 'Raw country / essential building' : '${countryBuildings.length} buildings installed'),
+            trailing: Text('$level / $maxCountryLevel', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          ListTile(
+            title: const Text('Country value'),
+            trailing: Text(country.value == null ? '—' : '\$${country.value}'),
+          ),
+          if (countryBuildings.isNotEmpty)
+            for (final building in countryBuildings)
+              Builder(
+                builder: (_) {
+                  final type = buildingTypes.where((x) => x.id == building.buildingTypeId).firstOrNull;
+                  final isEssential = building.buildingTypeId == essentialBuildingTypeId;
+                  return ListTile(
+                    leading: Icon(isEssential ? Icons.account_balance : Icons.business),
+                    title: Text(type?.name ?? 'Building'),
+                    subtitle: Text(isEssential ? 'Essential • Level 1' : 'Building added at country Level ${countryBuildings.indexOf(building) + 1}'),
+                  );
+                },
+              ),
+          if (ownedByMe)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _buildSection(country, countryBuildings, level),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSection(Country country, List<CountryBuilding> currentBuildings, int level) {
+    final canBuild = level < maxCountryLevel;
+    final available = buildingTypes.where((type) =>
+      type.id != essentialBuildingTypeId && !currentBuildings.any((b) => b.buildingTypeId == type.id),
+    ).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(),
+        Row(
+          children: [
+            const Expanded(child: Text('Add a building', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+            Text('Level $level → ${canBuild ? level + 1 : level}'),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Text('Each new building upgrades the country by one level. Buildings themselves do not have upgrade levels.'),
+        const SizedBox(height: 8),
+        if (!canBuild)
+          const ListTile(leading: Icon(Icons.verified), title: Text('Maximum country level reached'), subtitle: Text('All 5 building levels are complete.')),
+        if (canBuild && available.isEmpty)
+          const ListTile(leading: Icon(Icons.info_outline), title: Text('No more buildings available')),
+        if (canBuild)
+          for (final type in available)
+            ListTile(
+              title: Text(type.name),
+              subtitle: Text('Cost: ${type.baseCost} • Country becomes Level ${level + 1}'),
+              trailing: FilledButton(
+                onPressed: () => addBuilding(country, type),
+                child: const Text('Build'),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+class _LevelBadge extends StatelessWidget {
+  final int level;
+  final int maxLevel;
+  const _LevelBadge({required this.level, required this.maxLevel});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.cyanAccent),
+    ),
+    child: Text('LV $level/$maxLevel', style: const TextStyle(fontWeight: FontWeight.bold)),
+  );
 }
 
 void _snack(BuildContext context, Object error) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
