@@ -229,7 +229,7 @@ class _CountryMarker extends StatelessWidget {
           width: selected ? 86 : 76,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
           decoration: BoxDecoration(
-            color: selected ? accentwithValues(alpha:.22) : const Color(0xDD071827),
+            color: selected ? accent.withValues(alpha: .22) : const Color(0xDD071827),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: selected ? accent : accent.withValues(alpha: .55), width: selected ? 2 : 1),
             boxShadow: [BoxShadow(color: accent.withValues(alpha: .18), blurRadius: selected ? 18 : 8)],
