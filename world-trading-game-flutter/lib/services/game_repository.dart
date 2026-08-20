@@ -169,6 +169,33 @@ class GameRepository {
     return Map<String, dynamic>.from(result as Map);
   }
 
+  Future<Map<String, dynamic>> fetchAdminGameData(String gameId) async {
+    _requireAuth();
+    final result = await client.rpc('admin_get_game_data', params: {'p_game': gameId});
+    return Map<String, dynamic>.from(result as Map);
+  }
+
+  Future<void> adminUpdateGame(String gameId, Map<String, dynamic> patch) async {
+    _requireAuth();
+    await client.rpc('admin_update_game', params: {'p_game': gameId, 'p_patch': patch});
+  }
+
+  Future<void> adminUpdateEntity({required String entity, required String id, required Map<String, dynamic> patch}) async {
+    _requireAuth();
+    await client.rpc('admin_update_entity', params: {'p_entity': entity, 'p_id': id, 'p_patch': patch});
+  }
+
+  Future<String> adminAdjustBalance({required String playerId, required int amount, String currency = 'USD', String reason = 'admin_adjustment'}) async {
+    _requireAuth();
+    final result = await client.rpc('admin_adjust_balance', params: {
+      'p_player': playerId,
+      'p_amount': amount,
+      'p_currency': currency,
+      'p_reason': reason,
+    });
+    return result.toString();
+  }
+
   Future<void> _lifecycle(String function, String gameId) async {
     _requireAuth();
     await client.rpc(function, params: {'p_game': gameId});
