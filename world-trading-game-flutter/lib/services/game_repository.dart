@@ -79,21 +79,15 @@ class GameRepository {
 
   Future<String> purchaseBuildings({required String countryId, required int buildingTypeId, int quantity = 1}) async {
     _requireAuth();
-    if (quantity <= 0) throw ArgumentError.value(quantity, 'quantity');
+    if (quantity != 1) {
+      throw ArgumentError('A country can receive only one building per build action.');
+    }
     final result = await client.rpc('purchase_buildings', params: {
       'p_country': countryId,
       'p_building_type': buildingTypeId,
-      'p_quantity': quantity,
+      'p_quantity': 1,
     });
     return result.toString();
-  }
-
-  Future<void> upgradeBuilding({required String countryBuildingId, required int newLevel}) async {
-    _requireAuth();
-    await client.rpc('upgrade_country_building', params: {
-      'p_country_building': countryBuildingId,
-      'p_new_level': newLevel,
-    });
   }
 
   Future<String> sellCountry({required String countryId, required int price, String currency = 'USD', DateTime? expiresAt}) async {
