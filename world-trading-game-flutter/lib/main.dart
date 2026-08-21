@@ -115,8 +115,8 @@ class _AuthPageState extends State<AuthPage> {
         final response = await auth.signUp(email: emailValue, password: passwordValue, displayName: name.text.trim());
         if (response.session == null && mounted) {
           setState(() {
-            message = 'Account request received. Check your email to confirm your account. If this email is already registered, switch to Sign in.';
-            messageIsError = false;
+            message = 'Account created, but no active session was returned. Email confirmation may still be enabled in Supabase. Disable Confirm email in Authentication → Providers → Email, then try again.';
+            messageIsError = true;
           });
         }
       } else {
