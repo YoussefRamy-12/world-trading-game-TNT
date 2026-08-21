@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'admin_console.dart';
 import 'models/game.dart';
 import 'services/action_guard.dart';
+import 'services/admin_repository_extensions.dart';
 import 'services/game_repository.dart';
 
 class AdminDashboardPage extends StatefulWidget {
@@ -20,10 +21,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String? error;
 
   @override
-  void initState() {
-    super.initState();
-    load();
-  }
+  void initState() { super.initState(); load(); }
 
   Future<void> load() async {
     if (mounted) setState(() { loading = true; error = null; });
@@ -52,38 +50,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(dialog, {
-            'name': name.text.trim(),
-            'slug': slug.text.trim(),
-            'tick': int.tryParse(tick.text.trim()) ?? 3600,
-            'starting': int.tryParse(startingBalance.text.trim()) ?? 100000,
-          }), child: const Text('Create')),
+          FilledButton(onPressed: () => Navigator.pop(dialog, {'name': name.text.trim(), 'slug': slug.text.trim(), 'tick': int.tryParse(tick.text.trim()) ?? 3600, 'starting': int.tryParse(startingBalance.text.trim()) ?? 100000}), child: const Text('Create')),
         ],
       ),
     );
     name.dispose(); slug.dispose(); tick.dispose(); startingBalance.dispose();
     if (result == null) return;
     try {
-      await guard.run('admin:create-game', () => repo.adminCreateGame(
-        name: result['name'] as String,
-        slug: result['slug'] as String,
-        tickIntervalSeconds: result['tick'] as int,
-        startingBalance: result['starting'] as int,
-      ));
+      await guard.run('admin:create-game', () => repo.adminCreateGame(name: result['name'] as String, slug: result['slug'] as String, tickIntervalSeconds: result['tick'] as int, startingBalance: result['starting'] as int));
       await load();
       if (mounted) _snack('Game created as DRAFT. Configure it, then press Ready.');
-    } catch (e) {
-      if (mounted) _snack(e.toString());
-    }
+    } catch (e) { if (mounted) _snack(e.toString()); }
   }
 
   void openGame(Game game) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => AdminConsolePage(
-      gameId: game.id,
-      repository: repo,
-      guard: guard,
-      onChanged: load,
-    ))).then((_) => load());
+    Navigator.push(context, MaterialPageRoute(builder: (_) => AdminConsolePage(gameId: game.id, repository: repo, guard: guard, onChanged: load))).then((_) => load());
   }
 
   void _snack(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
