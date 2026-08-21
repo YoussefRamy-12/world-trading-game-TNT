@@ -19,26 +19,38 @@ extension AdminRepositoryExtensions on GameRepository {
     return result.toString();
   }
 
-  Future<String> adminCreateCountry({required String gameId, required String name, String? code, int population = 0}) async {
+  Future<String> adminCreateCountry({
+    required String gameId,
+    required String name,
+    int priceUsd = 0,
+  }) async {
     _requireAdminAuth();
     final result = await client.rpc('admin_create_country', params: {
       'p_game': gameId,
       'p_name': name,
-      'p_code': code,
-      'p_population': population,
+      'p_code': null,
+      'p_population': 0,
       'p_resources': <String, dynamic>{},
+      'p_base_price': priceUsd * 100,
     });
     return result.toString();
   }
 
-  Future<int> adminCreateBuildingType({required String slug, required String name, required int baseCost, required int baseIncome, required int maintenanceCost, required int maxLevel}) async {
+  Future<int> adminCreateBuildingType({
+    required String name,
+    required int priceUsd,
+    required int incomeUsd,
+    int maintenanceUsd = 0,
+    int maxLevel = 1,
+  }) async {
     _requireAdminAuth();
+    final slug = '${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-|-$'), '')}-${DateTime.now().millisecondsSinceEpoch}';
     final result = await client.rpc('admin_create_building_type', params: {
       'p_slug': slug,
       'p_name': name,
-      'p_base_cost': baseCost,
-      'p_base_income': baseIncome,
-      'p_maintenance_cost': maintenanceCost,
+      'p_base_cost': priceUsd * 100,
+      'p_base_income': incomeUsd * 100,
+      'p_maintenance_cost': maintenanceUsd * 100,
       'p_max_level': maxLevel,
     });
     return result is num ? result.toInt() : int.parse(result.toString());
@@ -53,6 +65,16 @@ extension AdminRepositoryExtensions on GameRepository {
       'p_count': count,
     });
     return result.toString();
+  }
+
+  Future<void> adminAdjustBalanceUsd({required String playerId, required int amountUsd, String reason = 'Admin adjustment'}) async {
+    _requireAdminAuth();
+    await client.rpc('admin_adjust_balance', params: {
+      'p_player': playerId,
+      'p_amount': amountUsd * 100,
+      'p_currency': 'USD',
+      'p_reason': reason,
+    });
   }
 
   Future<void> bootstrapFirstAdmin() async {
