@@ -77,7 +77,8 @@ class _AuthPageState extends State<AuthPage> {
   final auth = AuthService();
   bool signup = false;
   bool busy = false;
-  String? error;
+  String? message;
+  bool messageIsError = false;
 
   @override
   void dispose() {
@@ -88,33 +89,106 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   Future<void> submit() async {
+    FocusScope.of(context).unfocus();
+
+    final emailValue = email.text.trim();
+    final passwordValue = password.text;
+
+    if (emailValue.isEmpty) {
+      setState(() {
+        message = 'Please enter your email.';
+        messageIsError = true;
+      });
+      return;
+    }
+
+    if (!emailValue.contains('@')) {
+      setState(() {
+        message = 'Please enter a valid email address.';
+        messageIsError = true;
+      });
+      return;
+    }
+
+    if (passwordValue.length < 6) {
+      setState(() {
+        message = 'Password must be at least 6 characters.';
+        messageIsError = true;
+      });
+      return;
+    }
+
+    if (signup && name.text.trim().isEmpty) {
+      setState(() {
+        message = 'Display name is required.';
+        messageIsError = true;
+      });
+      return;
+    }
+
     setState(() {
       busy = true;
-      error = null;
+      message = null;
+      messageIsError = false;
     });
+
     try {
       if (signup) {
-        final displayName = name.text.trim();
-        if (displayName.isEmpty) {
-          throw StateError('Display name is required.');
-        }
-        await auth.signUp(
-          email: email.text,
-          password: password.text,
-          displayName: displayName,
+        final response = await auth.signUp(
+          email: emailValue,
+          password: passwordValue,
+          displayName: name.text.trim(),
         );
+
+        if (response.session == null) {
+          if (!mounted) return;
+          setState(() {
+            message = 'Account request received. Check your email to confirm '
+                'your account. If this email is already registered, switch '
+                'to Sign in.';
+            messageIsError = false;
+          });
+        }
+        // If a session was returned, RootPage will automatically move to the
+        // lobby through the auth-state stream.
       } else {
-        await auth.signIn(email: email.text, password: password.text);
+        final response = await auth.signIn(
+          email: emailValue,
+          password: passwordValue,
+        );
+
+        if (response.session == null) {
+          throw StateError('Sign in did not create a session. Please try again.');
+        }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        setState(() {
+          message = e.message;
+          messageIsError = true;
+        });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => error = e.toString());
+        setState(() {
+          message = e.toString().replaceFirst('Exception: ', '');
+          messageIsError = true;
+        });
       }
     } finally {
       if (mounted) {
         setState(() => busy = false);
       }
     }
+  }
+
+  void toggleMode() {
+    if (busy) return;
+    setState(() {
+      signup = !signup;
+      message = null;
+      messageIsError = false;
+    });
   }
 
   @override
@@ -145,6 +219,7 @@ class _AuthPageState extends State<AuthPage> {
                   if (signup) ...[
                     TextField(
                       controller: name,
+                      textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
                         labelText: 'Display name',
                       ),
@@ -154,38 +229,54 @@ class _AuthPageState extends State<AuthPage> {
                   TextField(
                     controller: email,
                     keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(labelText: 'Email'),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: password,
                     obscureText: true,
+                    onSubmitted: (_) => busy ? null : submit(),
                     decoration: const InputDecoration(labelText: 'Password'),
                   ),
                   const SizedBox(height: 16),
-                  if (error != null)
-                    Text(
-                      error!,
-                      style: const TextStyle(color: Colors.redAccent),
+                  if (message != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: messageIsError
+                              ? Colors.redAccent
+                              : Colors.greenAccent,
+                        ),
+                      ),
+                      child: Text(
+                        message!,
+                        style: TextStyle(
+                          color: messageIsError
+                              ? Colors.redAccent
+                              : Colors.greenAccent,
+                        ),
+                      ),
                     ),
-                  const SizedBox(height: 8),
-                  FilledButton(
-                    onPressed: busy ? null : submit,
-                    child: Text(
-                      busy
-                          ? 'Please wait...'
-                          : signup
-                              ? 'Create account'
-                              : 'Sign in',
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: busy ? null : submit,
+                      child: Text(
+                        busy
+                            ? 'Please wait...'
+                            : signup
+                                ? 'Create account'
+                                : 'Sign in',
+                      ),
                     ),
                   ),
                   TextButton(
-                    onPressed: busy
-                        ? null
-                        : () => setState(() {
-                              signup = !signup;
-                              error = null;
-                            }),
+                    onPressed: busy ? null : toggleMode,
                     child: Text(
                       signup
                           ? 'Already have an account? Sign in'
