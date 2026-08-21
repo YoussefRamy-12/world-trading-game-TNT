@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'admin_console.dart';
 import 'models/game.dart';
@@ -8,7 +9,6 @@ import 'services/game_repository.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
-
   @override
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
 }
@@ -31,6 +31,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     } catch (e) {
       if (mounted) setState(() { error = e.toString(); loading = false; });
     }
+  }
+
+  Future<void> logout() async {
+    await Supabase.instance.client.auth.signOut();
   }
 
   Future<void> createGame() async {
@@ -72,7 +76,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Admin Dashboard'), actions: [IconButton(onPressed: load, icon: const Icon(Icons.refresh))]),
+      appBar: AppBar(title: const Text('Admin Dashboard'), actions: [
+        IconButton(tooltip: 'Refresh', onPressed: load, icon: const Icon(Icons.refresh)),
+        IconButton(tooltip: 'Logout', onPressed: logout, icon: const Icon(Icons.logout)),
+      ]),
       floatingActionButton: FloatingActionButton.extended(onPressed: createGame, icon: const Icon(Icons.add), label: const Text('New Game')),
       body: loading
           ? const Center(child: CircularProgressIndicator())
