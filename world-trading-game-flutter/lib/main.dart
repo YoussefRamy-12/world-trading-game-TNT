@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'game_hub.dart';
 import 'models/game.dart';
+import 'post_login_router.dart';
 import 'services/action_guard.dart';
 import 'services/auth_service.dart';
 import 'services/game_repository.dart';
@@ -57,7 +58,7 @@ class RootPage extends StatelessWidget {
       stream: AuthService().authStateChanges,
       builder: (context, snapshot) {
         final session = Supabase.instance.client.auth.currentSession;
-        return session == null ? const AuthPage() : const LobbyPage();
+        return session == null ? const AuthPage() : const PostLoginRouter();
       },
     );
   }
@@ -90,105 +91,50 @@ class _AuthPageState extends State<AuthPage> {
 
   Future<void> submit() async {
     FocusScope.of(context).unfocus();
-
     final emailValue = email.text.trim();
     final passwordValue = password.text;
-
     if (emailValue.isEmpty) {
-      setState(() {
-        message = 'Please enter your email.';
-        messageIsError = true;
-      });
+      setState(() { message = 'Please enter your email.'; messageIsError = true; });
       return;
     }
-
     if (!emailValue.contains('@')) {
-      setState(() {
-        message = 'Please enter a valid email address.';
-        messageIsError = true;
-      });
+      setState(() { message = 'Please enter a valid email address.'; messageIsError = true; });
       return;
     }
-
     if (passwordValue.length < 6) {
-      setState(() {
-        message = 'Password must be at least 6 characters.';
-        messageIsError = true;
-      });
+      setState(() { message = 'Password must be at least 6 characters.'; messageIsError = true; });
       return;
     }
-
     if (signup && name.text.trim().isEmpty) {
-      setState(() {
-        message = 'Display name is required.';
-        messageIsError = true;
-      });
+      setState(() { message = 'Display name is required.'; messageIsError = true; });
       return;
     }
-
-    setState(() {
-      busy = true;
-      message = null;
-      messageIsError = false;
-    });
-
+    setState(() { busy = true; message = null; messageIsError = false; });
     try {
       if (signup) {
-        final response = await auth.signUp(
-          email: emailValue,
-          password: passwordValue,
-          displayName: name.text.trim(),
-        );
-
-        if (response.session == null) {
-          if (!mounted) return;
+        final response = await auth.signUp(email: emailValue, password: passwordValue, displayName: name.text.trim());
+        if (response.session == null && mounted) {
           setState(() {
-            message = 'Account request received. Check your email to confirm '
-                'your account. If this email is already registered, switch '
-                'to Sign in.';
+            message = 'Account request received. Check your email to confirm your account. If this email is already registered, switch to Sign in.';
             messageIsError = false;
           });
         }
-        // If a session was returned, RootPage will automatically move to the
-        // lobby through the auth-state stream.
       } else {
-        final response = await auth.signIn(
-          email: emailValue,
-          password: passwordValue,
-        );
-
-        if (response.session == null) {
-          throw StateError('Sign in did not create a session. Please try again.');
-        }
+        final response = await auth.signIn(email: emailValue, password: passwordValue);
+        if (response.session == null) throw StateError('Sign in did not create a session. Please try again.');
       }
     } on AuthException catch (e) {
-      if (mounted) {
-        setState(() {
-          message = e.message;
-          messageIsError = true;
-        });
-      }
+      if (mounted) setState(() { message = e.message; messageIsError = true; });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          message = e.toString().replaceFirst('Exception: ', '');
-          messageIsError = true;
-        });
-      }
+      if (mounted) setState(() { message = e.toString().replaceFirst('Exception: ', ''); messageIsError = true; });
     } finally {
-      if (mounted) {
-        setState(() => busy = false);
-      }
+      if (mounted) setState(() => busy = false);
     }
   }
 
   void toggleMode() {
     if (busy) return;
-    setState(() {
-      signup = !signup;
-      message = null;
-      messageIsError = false;
-    });
+    setState(() { signup = !signup; message = null; messageIsError = false; });
   }
 
   @override
@@ -200,91 +146,29 @@ class _AuthPageState extends State<AuthPage> {
           child: Card(
             child: Padding(
               padding: const EdgeInsets.all(28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'WORLD TRADING GAME',
-                    style: TextStyle(
-                      letterSpacing: 3,
-                      color: Colors.cyanAccent,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    signup ? 'Create account' : 'Sign in',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 20),
-                  if (signup) ...[
-                    TextField(
-                      controller: name,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Display name',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  TextField(
-                    controller: email,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                  ),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Text('WORLD TRADING GAME', style: TextStyle(letterSpacing: 3, color: Colors.cyanAccent)),
+                const SizedBox(height: 8),
+                Text(signup ? 'Create account' : 'Sign in', style: Theme.of(context).textTheme.headlineMedium),
+                const SizedBox(height: 20),
+                if (signup) ...[
+                  TextField(controller: name, textInputAction: TextInputAction.next, decoration: const InputDecoration(labelText: 'Display name')),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: password,
-                    obscureText: true,
-                    onSubmitted: (_) => busy ? null : submit(),
-                    decoration: const InputDecoration(labelText: 'Password'),
-                  ),
-                  const SizedBox(height: 16),
-                  if (message != null)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: messageIsError
-                              ? Colors.redAccent
-                              : Colors.greenAccent,
-                        ),
-                      ),
-                      child: Text(
-                        message!,
-                        style: TextStyle(
-                          color: messageIsError
-                              ? Colors.redAccent
-                              : Colors.greenAccent,
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: busy ? null : submit,
-                      child: Text(
-                        busy
-                            ? 'Please wait...'
-                            : signup
-                                ? 'Create account'
-                                : 'Sign in',
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: busy ? null : toggleMode,
-                    child: Text(
-                      signup
-                          ? 'Already have an account? Sign in'
-                          : 'Create an account',
-                    ),
-                  ),
                 ],
-              ),
+                TextField(controller: email, keyboardType: TextInputType.emailAddress, textInputAction: TextInputAction.next, decoration: const InputDecoration(labelText: 'Email')),
+                const SizedBox(height: 12),
+                TextField(controller: password, obscureText: true, onSubmitted: (_) => busy ? null : submit(), decoration: const InputDecoration(labelText: 'Password')),
+                const SizedBox(height: 16),
+                if (message != null) Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: messageIsError ? Colors.redAccent : Colors.greenAccent)),
+                  child: Text(message!, style: TextStyle(color: messageIsError ? Colors.redAccent : Colors.greenAccent)),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(width: double.infinity, child: FilledButton(onPressed: busy ? null : submit, child: Text(busy ? 'Please wait...' : signup ? 'Create account' : 'Sign in'))),
+                TextButton(onPressed: busy ? null : toggleMode, child: Text(signup ? 'Already have an account? Sign in' : 'Create an account')),
+              ]),
             ),
           ),
         ),
@@ -295,7 +179,6 @@ class _AuthPageState extends State<AuthPage> {
 
 class LobbyPage extends StatefulWidget {
   const LobbyPage({super.key});
-
   @override
   State<LobbyPage> createState() => _LobbyPageState();
 }
@@ -308,49 +191,27 @@ class _LobbyPageState extends State<LobbyPage> {
   String? error;
 
   @override
-  void initState() {
-    super.initState();
-    load();
-  }
+  void initState() { super.initState(); load(); }
 
   Future<void> load() async {
-    setState(() {
-      loading = true;
-      error = null;
-    });
+    setState(() { loading = true; error = null; });
     try {
       final player = await repo.fetchCurrentPlayer();
       if (player == null) {
         final user = Supabase.instance.client.auth.currentUser;
-        await repo.registerPlayer(
-          displayName: user?.userMetadata?['display_name']?.toString() ??
-              user?.email?.split('@').first ??
-              'Player',
-        );
+        await repo.registerPlayer(displayName: user?.userMetadata?['display_name']?.toString() ?? user?.email?.split('@').first ?? 'Player');
       }
       games = await repo.fetchGames();
-    } catch (e) {
-      error = e.toString();
-    }
-    if (mounted) {
-      setState(() => loading = false);
-    }
+    } catch (e) { error = e.toString(); }
+    if (mounted) setState(() => loading = false);
   }
 
   Future<void> join(Game game) async {
     try {
-      await guard.run(
-        'join:${game.id}',
-        () => repo.joinGame(game.id),
-      );
+      await guard.run('join:${game.id}', () => repo.joinGame(game.id));
       if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => GameHubPage(game: game)),
-      );
-    } catch (e) {
-      if (mounted) _snack(context, e);
-    }
+      Navigator.push(context, MaterialPageRoute(builder: (_) => GameHubPage(game: game)));
+    } catch (e) { if (mounted) _snack(context, e); }
   }
 
   @override
@@ -360,66 +221,34 @@ class _LobbyPageState extends State<LobbyPage> {
         title: const Text('Game Lobby'),
         actions: [
           IconButton(onPressed: load, icon: const Icon(Icons.refresh)),
-          IconButton(
-            onPressed: () => AuthService().signOut(),
-            icon: const Icon(Icons.logout),
-          ),
+          IconButton(onPressed: () => AuthService().signOut(), icon: const Icon(Icons.logout)),
         ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: load,
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  if (error != null)
-                    Text(
-                      error!,
-                      style: const TextStyle(color: Colors.redAccent),
-                    ),
-                  if (games.isEmpty)
-                    const Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text('No games available.'),
-                      ),
-                    ),
-                  for (final game in games)
-                    Card(
-                      child: ListTile(
-                        title: Text(game.name),
-                        subtitle: Text(
-                          '${game.state.toUpperCase()} • tick ${game.currentTick}',
-                        ),
-                        trailing: FilledButton(
-                          onPressed: game.state == 'finished'
-                              ? null
-                              : () => join(game),
-                          child: const Text('Join'),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              child: ListView(padding: const EdgeInsets.all(20), children: [
+                if (error != null) Text(error!, style: const TextStyle(color: Colors.redAccent)),
+                if (games.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(24), child: Text('No games available.'))),
+                for (final game in games) Card(child: ListTile(
+                  title: Text(game.name),
+                  subtitle: Text('${game.state.toUpperCase()} • tick ${game.currentTick}'),
+                  trailing: FilledButton(onPressed: game.state == 'finished' ? null : () => join(game), child: const Text('Join')),
+                )),
+              ]),
             ),
     );
   }
 }
 
 void _snack(BuildContext context, Object error) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(error.toString())),
-  );
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
 }
 
 class _MessagePage extends StatelessWidget {
   final String message;
-
   const _MessagePage(this.message);
-
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(body: Center(child: Text(message)));
-  }
+  Widget build(BuildContext context) => Scaffold(body: Center(child: Text(message)));
 }
