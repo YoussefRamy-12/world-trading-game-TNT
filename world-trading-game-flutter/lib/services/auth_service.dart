@@ -8,16 +8,27 @@ class AuthService {
   Session? get currentSession => client.auth.currentSession;
   Stream<AuthState> get authStateChanges => client.auth.onAuthStateChange;
 
-  Future<void> signIn({required String email, required String password}) async {
-    await client.auth.signInWithPassword(email: email.trim(), password: password);
+  Future<AuthResponse> signIn({
+    required String email,
+    required String password,
+  }) async {
+    return client.auth.signInWithPassword(
+      email: email.trim(),
+      password: password,
+    );
   }
 
-  Future<void> signUp({required String email, required String password, String? displayName}) async {
-    await client.auth.signUp(
+  Future<AuthResponse> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    return client.auth.signUp(
       email: email.trim(),
       password: password,
       data: {
-        if (displayName != null && displayName.trim().isNotEmpty) 'display_name': displayName.trim(),
+        if (displayName != null && displayName.trim().isNotEmpty)
+          'display_name': displayName.trim(),
       },
     );
   }
