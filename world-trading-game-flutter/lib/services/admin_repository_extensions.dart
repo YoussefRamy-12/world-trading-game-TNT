@@ -28,8 +28,8 @@ extension AdminRepositoryExtensions on GameRepository {
   }
 
   Future<bool> hasAnyAdmin() async {
-    final row = await client.from('players').select('id').eq('is_admin', true).limit(1).maybeSingle();
-    return row != null;
+    final result = await client.rpc('has_any_admin');
+    return result == true;
   }
 
   void _requireAdminAuth() {
