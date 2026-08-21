@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'admin_dashboard.dart';
-import 'main.dart' show LobbyPage;
+import 'player_lobby.dart';
 import 'services/admin_repository_extensions.dart';
 import 'services/game_repository.dart';
 
@@ -55,9 +55,7 @@ class _PostLoginRouterState extends State<PostLoginRouter> {
       await repo.bootstrapFirstAdmin();
       await load();
     } catch (e) {
-      if (mounted) {
-        setState(() { error = e.toString(); loading = false; });
-      }
+      if (mounted) setState(() { error = e.toString(); loading = false; });
     }
   }
 
@@ -69,7 +67,7 @@ class _PostLoginRouterState extends State<PostLoginRouter> {
     }
     if (isAdmin == true) return const AdminDashboardPage();
     if (bootstrapAvailable) return _BootstrapPage(onBootstrap: bootstrap);
-    return const LobbyPage();
+    return const PlayerLobbyPage();
   }
 }
 
